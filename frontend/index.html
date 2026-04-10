@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Cost Optimization Engine</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js for graphs - loaded from CDN -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- ============================
+         TOP NAVIGATION BAR
+    ============================= -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="aws-logo">☁</span>
+            <span class="brand-text">AWS Cost <strong>Optimizer</strong></span>
+        </div>
+        <div class="nav-right">
+            <span class="period-badge" id="billing-period">Loading period...</span>
+            <button class="btn btn-refresh" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
+    </nav>
+
+    <!-- ============================
+         ALERT BANNER (shows when cost exceeds threshold)
+    ============================= -->
+    <div class="alert-banner" id="alert-banner" style="display:none;">
+        <span id="alert-message"></span>
+        <button onclick="closeAlert()">✕</button>
+    </div>
+
+    <!-- ============================
+         MAIN DASHBOARD CONTAINER
+    ============================= -->
+    <div class="container">
+
+        <!-- ============================
+             TOP STATS CARDS
+        ============================= -->
+        <div class="stats-grid">
+
+            <!-- Card 1: Total Cost -->
+            <div class="stat-card primary" id="card-total">
+                <div class="stat-label">Total Cost This Month</div>
+                <div class="stat-value" id="total-cost">$---</div>
+                <div class="stat-sub" id="cost-change">Loading...</div>
+            </div>
+
+            <!-- Card 2: Top Service -->
+            <div class="stat-card" id="card-top">
+                <div class="stat-label">Highest Cost Service</div>
+                <div class="stat-value" id="top-service">---</div>
+                <div class="stat-sub" id="top-service-cost">Loading...</div>
+            </div>
+
+            <!-- Card 3: Total Services -->
+            <div class="stat-card" id="card-services">
+                <div class="stat-label">Active AWS Services</div>
+                <div class="stat-value" id="total-services">---</div>
+                <div class="stat-sub">Being monitored</div>
+            </div>
+
+            <!-- Card 4: Suggestions Count -->
+            <div class="stat-card warning" id="card-suggestions">
+                <div class="stat-label">Optimization Suggestions</div>
+                <div class="stat-value" id="suggestion-count">---</div>
+                <div class="stat-sub">Potential savings available</div>
+            </div>
+
+        </div>
+
+        <!-- ============================
+             ALERT SETUP SECTION
+        ============================= -->
+        <div class="section alert-setup-section">
+            <h2 class="section-title">💰 Cost Alert System</h2>
+            <div class="alert-form">
+                <label>Set monthly budget limit:</label>
+                <div class="alert-input-row">
+                    <span class="dollar-sign">$</span>
+                    <input type="number" id="alert-threshold" placeholder="e.g. 250" min="0" />
+                    <button class="btn btn-primary" onclick="checkAlert()">Check Alert</button>
+                </div>
+                <div class="alert-result" id="alert-result"></div>
+            </div>
+        </div>
+
+        <!-- ============================
+             CHARTS SECTION
+        ============================= -->
+        <div class="charts-row">
+
+            <!-- Chart 1: Service Cost Pie/Doughnut -->
+            <div class="section chart-box">
+                <div class="section-header">
+                    <h2 class="section-title">Service Cost Breakdown</h2>
+                    <!-- Filter dropdown -->
+                    <select id="service-filter" class="filter-select" onchange="filterService()">
+                        <option value="all">All Services</option>
+                    </select>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="pie-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Monthly Trend Line -->
+            <div class="section chart-box">
+                <h2 class="section-title">6-Month Cost Trend</h2>
+                <div class="chart-wrapper">
+                    <canvas id="line-chart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ============================
+             SERVICE COST TABLE
+        ============================= -->
+        <div class="section">
+            <h2 class="section-title">Service-wise Cost Details</h2>
+            <div class="table-wrapper">
+                <table class="cost-table" id="cost-table">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Cost (USD)</th>
+                            <th>% of Total</th>
+                            <th>Usage</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cost-table-body">
+                        <!-- Rows injected by JavaScript -->
+                        <tr><td colspan="5" class="loading-row">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ============================
+             SUGGESTIONS PANEL
+        ============================= -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">🔍 Optimization Recommendations</h2>
+                <div class="filter-row">
+                    <button class="filter-btn active" onclick="filterSuggestions('all', this)">All</button>
+                    <button class="filter-btn" onclick="filterSuggestions('high', this)">🔴 High</button>
+                    <button class="filter-btn" onclick="filterSuggestions('medium', this)">🟡 Medium</button>
+                    <button class="filter-btn" onclick="filterSuggestions('low', this)">🟢 Low</button>
+                </div>
+            </div>
+
+            <div id="suggestions-list">
+                <!-- Suggestion cards injected by JavaScript -->
+                <div class="loading-msg">Loading recommendations...</div>
+            </div>
+
+            <!-- Total potential savings -->
+            <div class="savings-total" id="savings-total" style="display:none;">
+                <span>💵 Total Potential Monthly Savings:</span>
+                <strong id="total-savings-amount">$0</strong>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>AWS Cost Optimization Engine &nbsp;|&nbsp; College Mini Project &nbsp;|&nbsp; Data: Mock / AWS SDK</p>
+    </footer>
+
+    <!-- ============================
+         OPTIMIZE NOW MODAL
+    ============================= -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h3 id="modal-title">Apply Optimization</h3>
+            <p id="modal-body">Are you sure you want to apply this optimization?</p>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="modal-confirm" onclick="applyOptimization()">✅ Apply Now</button>
+                <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Chart.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <!-- Load our custom JS -->
+    <script src="js/app.js"></script>
+
+</body>
+</html>
