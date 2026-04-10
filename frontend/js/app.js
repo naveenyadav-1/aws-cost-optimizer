@@ -12,7 +12,10 @@
 
 // Backend API base URL
 // When running locally, server is on port 3000
-const API_BASE = "http://localhost:3000/api";
+ // localhost pe bhi kaam kare aur live site pe bhi
+ const API_BASE = window.location.hostname === "localhost" 
+    ? "http://localhost:3000/api" 
+    : "/api";
 
 // Store current data globally so filters can use it
 let currentServices = [];
