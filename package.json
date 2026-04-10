@@ -8,12 +8,18 @@
     "dev": "nodemon backend/server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-cost-explorer": "^3.1029.0",
     "cors": "^2.8.5",
     "express": "^4.18.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["aws", "cost", "optimization", "cloud"],
+  "keywords": [
+    "aws",
+    "cost",
+    "optimization",
+    "cloud"
+  ],
   "author": "Student Project"
 }
