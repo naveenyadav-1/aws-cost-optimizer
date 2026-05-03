@@ -1,0 +1,296 @@
+cat > backend/middleware/authMiddleware.js << 'EOF'
+const jwt = require('jsonwebtoken');
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'];
+
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Access denied. Please login first.' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token format is invalid' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.id;
+    req.userEmail = decoded.email;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Session expired. Please login again.' });
+  }
+}
+
+module.exports = authMiddleware;
+EOF
+cat > ...
+cat > backend/models/User.js << 'EOF'
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true, minlength: 6 },
+  awsAccessKey: { type: String, default: '' },
+  awsSecretKey: { type: String, default: '' },
+  awsRegion: { type: String, default: 'us-east-1' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.methods.comparePassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
+EOF
+cat > backend/models/User.js << 'EOF'
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true, minlength: 6 },
+  awsAccessKey: { type: String, default: '' },
+  awsSecretKey: { type: String, default: '' },
+  awsRegion: { type: String, default: 'us-east-1' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.methods.comparePassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
+EOF
+cat > backend/models/User.js << 'EOF'
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true, minlength: 6 },
+  awsAccessKey: { type: String, default: '' },
+  awsSecretKey: { type: String, default: '' },
+  awsRegion: { type: String, default: 'us-east-1' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.methods.comparePassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
+EOF
+cat > ...
+cat > backend/models/User.js << 'EOF'
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true, minlength: 6 },
+  awsAccessKey: { type: String, default: '' },
+  awsSecretKey: { type: String, default: '' },
+  awsRegion: { type: String, default: 'us-east-1' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.methods.comparePassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
+EOF
+cat < ...
+cat > backend/db.js << 'EOF'
+const mongoose = require('mongoose');
+
+async function connectDB() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log('✅ MongoDB connected successfully');
+  } catch (err) {
+    console.error('❌ MongoDB connection failed:', err.message);
+    process.exit(1);
+  }
+}
+
+module.exports = connectDB;
+EOF
+cat < ...
+cat > backend/routes/auth.js << 'EOF'
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const authMiddleware = require('../middleware/authMiddleware');
+
+const router = express.Router();
+
+router.post('/register', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ error: 'Account already exists with this email' });
+    await User.create({ email, password });
+    res.status(201).json({ message: 'Account created successfully! Please login.' });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+});
+
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) return res.status(401).json({ error: 'Invalid email or password' });
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      message: 'Login successful',
+      token,
+      user: { id: user._id, email: user.email, awsRegion: user.awsRegion, hasAwsCredentials: !!(user.awsAccessKey && user.awsSecretKey) }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+});
+
+router.post('/credentials', authMiddleware, async (req, res) => {
+  try {
+    const { accessKey, secretKey, region } = req.body;
+    if (!accessKey || !secretKey) return res.status(400).json({ error: 'Access key and secret key are required' });
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.awsAccessKey = accessKey;
+    user.awsSecretKey = secretKey;
+    user.awsRegion = region || 'us-east-1';
+    await user.save();
+    res.json({ message: 'AWS credentials saved successfully!' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save credentials' });
+  }
+});
+
+router.get('/credentials', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      hasCredentials: !!(user.awsAccessKey && user.awsSecretKey),
+      region: user.awsRegion,
+      accessKeyHint: user.awsAccessKey ? user.awsAccessKey.substring(0, 4) + '****' : null
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get credentials' });
+  }
+});
+
+module.exports = router;
+EOF
+cat > backend/server.js << 'EOF'
+require('dotenv').config();
+
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+
+const connectDB = require('./db');
+const authRoutes = require('./routes/auth');
+const authMiddleware = require('./middleware/authMiddleware');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const services = [
+  { name: "EC2", fullName: "Amazon EC2", cost: 120.00, usage: "720 hours", percentage: 50 },
+  { name: "S3", fullName: "Amazon S3", cost: 40.00, usage: "1.2 TB", percentage: 17 },
+  { name: "RDS", fullName: "Amazon RDS", cost: 60.00, usage: "db.t3.medium", percentage: 25 },
+  { name: "Lambda", fullName: "AWS Lambda", cost: 20.00, usage: "2.1M requests", percentage: 8 }
+];
+
+const history = [
+  { month: "Nov", cost: 210.50 }, { month: "Dec", cost: 225.30 },
+  { month: "Jan", cost: 198.70 }, { month: "Feb", cost: 245.60 },
+  { month: "Mar", cost: 260.10 }, { month: "Apr", cost: 240.00 }
+];
+
+const suggestions = [
+  { title: "Stop idle EC2 instances", detail: "2 EC2 instances have been idle for 7+ days.", type: "EC2", severity: "high", savings: 48.00, icon: "🔴", action: "stop-ec2", resourceId: "i-0abc123" },
+  { title: "Move S3 logs to Glacier", detail: "Old log files can be moved to Glacier storage class.", type: "S3", severity: "medium", savings: 12.00, icon: "🟡", action: "s3-glacier", resourceId: "my-app-logs" },
+  { title: "Resize RDS to smaller instance", detail: "RDS CPU usage is below 10%.", type: "RDS", severity: "medium", savings: 15.00, icon: "🟡", action: "resize-rds", resourceId: "mydb-dev" }
+];
+
+connectDB().then(() => {
+  app.use(cors());
+  app.use(express.json());
+  app.use(express.static(path.join(__dirname, '../frontend')));
+
+  // Public routes
+  app.use('/api/auth', authRoutes);
+
+  // Protected routes
+  app.get('/api/dashboard', authMiddleware, (req, res) => {
+    const totalCost = services.reduce((sum, s) => sum + s.cost, 0);
+    const topService = services.reduce((prev, curr) => curr.cost > prev.cost ? curr : prev);
+    res.json({
+      success: true,
+      data: { totalCost, changePercent: 5.2, topService, services, history, period: { start: "2025-03-21", end: "2025-04-21" }, stats: { totalServices: services.length } },
+      estimatedSavings: totalCost * 0.3
+    });
+  });
+
+  app.get('/api/suggestions', authMiddleware, (req, res) => {
+    res.json({ success: true, suggestions });
+  });
+
+  app.post('/api/alerts', authMiddleware, (req, res) => {
+    const { threshold } = req.body;
+    if (!threshold || isNaN(threshold)) return res.status(400).json({ success: false, message: "Invalid threshold" });
+    const totalCost = services.reduce((sum, s) => sum + s.cost, 0);
+    const isAlert = totalCost > threshold;
+    res.json({ success: true, alert: isAlert, currentCost: totalCost, threshold, message: isAlert ? `⚠ High cost! Current: $${totalCost} exceeds $${threshold}` : `✅ Cost is under control. Current: $${totalCost}` });
+  });
+
+  app.post('/api/optimize', authMiddleware, (req, res) => {
+    const { action, resourceId } = req.body;
+    res.json({ success: true, message: `Action "${action}" applied on "${resourceId}". Changes simulated successfully!` });
+  });
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
+  });
+});
+EOF
+npm run dev
